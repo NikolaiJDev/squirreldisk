@@ -69,7 +69,7 @@ class _MainScreenState extends State<MainScreen> {
   
   final List<Widget> _screens = [
     const DiskListScreen(),
-    const DiskDetailScreen(),
+    // DiskDetailScreen is navigated to via routes, not tabs
   ];
 
   @override
@@ -104,7 +104,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           Expanded(
-            child: _screens[_selectedIndex],
+            child: _screens.isNotEmpty ? _screens[0] : const SizedBox(),
           ),
         ],
       ),

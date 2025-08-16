@@ -319,7 +319,7 @@ void SquirrelDiskPlugin::GetDisks(std::unique_ptr<flutter::MethodResult<flutter:
                         disk_label = "Removable Disk (" + std::string(1, drive) + ":)";
                     } else if (drive_type == DRIVE_CDROM) {
                         disk_label = "DVD Drive (" + std::string(1, drive) + ":)";
-                    } else if (drive_type == DRIVE_NETWORK) {
+                    } else if (drive_type == DRIVE_REMOTE) {
                         disk_label = "Network Drive (" + std::string(1, drive) + ":)";
                     } else {
                         // Определяем тип по букве диска для системных дисков

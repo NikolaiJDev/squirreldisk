@@ -181,8 +181,8 @@ class _MainScreenState extends State<MainScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Total: ${disk.formattedTotalSpace}'),
-            Text('Free: ${disk.formattedFreeSpace}'),
             Text('Used: ${disk.formattedUsedSpace}'),
+            Text('Free: ${disk.formattedFreeSpace}'),
             Text('Usage: ${disk.usagePercentage.toStringAsFixed(1)}%'),
           ],
         ),

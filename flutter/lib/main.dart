@@ -11,7 +11,7 @@ void main() {
 }
 
 class SquirrelDiskApp extends StatelessWidget {
-  const SquirrelDiskApp({Key? key}) : super(key: key);
+  const SquirrelDiskApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class SquirrelDiskApp extends StatelessWidget {
         title: 'SquirrelDisk',
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
+        themeMode: ThemeMode.dark,
         home: const MainScreen(),
         debugShowCheckedModeBanner: false,
       ),

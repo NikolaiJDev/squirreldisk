@@ -78,7 +78,7 @@ class ChannelScanBackend implements ScanBackend {
       final result = await _channel.invokeMethod('getDisks');
       
       // Handle the new enhanced format from Windows plugin
-      if (result is Map<String, dynamic>) {
+      if (result is Map) {
         final disks = (result['disks'] as List?)?.map((e) => 
           Map<String, dynamic>.from(e as Map)).toList() ?? [];
         return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
@@ -94,6 +94,7 @@ class ChannelScanBackend implements ScanBackend {
   }
 
   // Add new methods for enhanced Windows plugin functionality
+  @override
   Future<void> showInFolder(String path) async {
     try {
       await _channel.invokeMethod('showInFolder', {'path': path});
@@ -102,6 +103,7 @@ class ChannelScanBackend implements ScanBackend {
     }
   }
 
+  @override
   Future<void> deleteFileOrFolder(String path, {bool force = false}) async {
     try {
       await _channel.invokeMethod('deleteFileOrFolder', {
@@ -113,6 +115,7 @@ class ChannelScanBackend implements ScanBackend {
     }
   }
 
+  @override
   Future<Map<String, dynamic>> getFileProperties(String path) async {
     try {
       final result = await _channel.invokeMethod('getFileProperties', {'path': path});
@@ -122,6 +125,7 @@ class ChannelScanBackend implements ScanBackend {
     }
   }
 
+  @override
   Future<void> openFile(String path) async {
     try {
       await _channel.invokeMethod('openFile', {'path': path});

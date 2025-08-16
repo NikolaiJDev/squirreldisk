@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class FormatUtils {
   /// Format bytes into human-readable format (e.g., 1.5 GB, 500 MB)
   static String formatBytes(int bytes) {
@@ -23,46 +25,49 @@ class FormatUtils {
   }
   
   /// Get file extension icon based on file name
-  static String getFileIcon(String fileName, bool isDirectory) {
-    if (isDirectory) return '📁';
-    
-    final extension = fileName.split('.').last.toLowerCase();
+  static IconData getFileIcon(String name, {bool isDirectory = false}) {
+    if (isDirectory) return Icons.folder;
+
+    final extension = name.split('.').last.toLowerCase();
     
     switch (extension) {
       case 'txt':
       case 'md':
       case 'doc':
       case 'docx':
-        return '📄';
+        return Icons.description;
       case 'pdf':
-        return '📋';
+        return Icons.picture_as_pdf;
       case 'jpg':
       case 'jpeg':
       case 'png':
       case 'gif':
       case 'bmp':
-        return '🖼️';
+        return Icons.image;
       case 'mp4':
       case 'avi':
       case 'mov':
       case 'wmv':
-        return '🎬';
+        return Icons.video_file;
       case 'mp3':
       case 'wav':
       case 'flac':
       case 'aac':
-        return '🎵';
+        return Icons.audio_file;
       case 'zip':
       case 'rar':
       case '7z':
       case 'tar':
-        return '🗜️';
+        return Icons.archive;
       case 'exe':
       case 'msi':
       case 'dmg':
       case 'deb':
       case 'rpm':
-        return '⚙️';
+        return Icons.system_update_alt;
+      case 'html':
+      case 'htm':
+      case 'css':
       case 'js':
       case 'ts':
       case 'dart':
@@ -71,9 +76,9 @@ class FormatUtils {
       case 'cpp':
       case 'c':
       case 'cs':
-        return '💻';
+        return Icons.code;
       default:
-        return '📄';
+        return Icons.insert_drive_file; // Default file icon
     }
   }
   

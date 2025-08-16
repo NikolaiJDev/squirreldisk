@@ -32,14 +32,14 @@ src-tauri/target
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins
-.flutter-plugins-dependencies
+flutter/.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
 /build/
 
 # Web related
-lib/generated_plugin_registrant.dart
+flutter/lib/generated_plugin_registrant.dart
 
 # Symbolication related
 app.*.symbols

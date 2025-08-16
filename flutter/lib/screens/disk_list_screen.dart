@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:file_picker/file_picker.dart';
+
 import '../services/disk_service.dart';
-import '../widgets/disk_item_widget.dart';
 import '../widgets/custom_folder_picker.dart';
-import '../utils/app_theme.dart';
+import '../widgets/disk_item_widget.dart';
 
 class DiskListScreen extends StatefulWidget {
   const DiskListScreen({super.key});
@@ -67,7 +66,7 @@ class _DiskListScreenState extends State<DiskListScreen> {
                   children: [
                     Icon(
                       Icons.storage,
-                      color: AppTheme.primaryPurple,
+                      color: Colors.deepPurple[300],
                       size: 32,
                     ),
                     const SizedBox(width: 12),

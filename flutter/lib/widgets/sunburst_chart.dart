@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../models/disk_models.dart';
+
+import 'package:flutter/material.dart';
+
+import '../models/disk_item.dart';
 import '../utils/format_utils.dart';
 
 class SunburstChart extends StatefulWidget {

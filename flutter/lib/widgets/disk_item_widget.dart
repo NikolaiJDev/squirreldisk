@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/disk_models.dart';
+
+import '../models/disk_info.dart';
 import '../utils/format_utils.dart';
 
 class DiskItemWidget extends StatelessWidget {
@@ -28,7 +29,7 @@ class DiskItemWidget extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(

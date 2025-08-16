@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../services/disk_service.dart';
-import '../widgets/sunburst_chart.dart';
+import '../theme/app_theme.dart';
 import '../widgets/scan_progress_widget.dart';
-import '../utils/app_theme.dart';
+import '../widgets/sunburst_chart.dart';
+import '../enums/scan_state.dart';
 
 class DiskDetailScreen extends StatefulWidget {
   const DiskDetailScreen({super.key});
@@ -14,7 +16,7 @@ class DiskDetailScreen extends StatefulWidget {
 
 class _DiskDetailScreenState extends State<DiskDetailScreen> {
   Map<String, dynamic>? _diskData;
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -49,7 +51,7 @@ class _DiskDetailScreenState extends State<DiskDetailScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.mediumGray,
+              color: Colors.grey[100],
               border: Border(
                 bottom: BorderSide(
                   color: Colors.grey.withOpacity(0.2),
@@ -84,7 +86,7 @@ class _DiskDetailScreenState extends State<DiskDetailScreen> {
                   builder: (context, diskService, child) {
                     return Row(
                       children: [
-                        if (diskService.isScanning)
+                        if (diskService.scanState == ScanState.scanning)
                           IconButton(
                             onPressed: () => diskService.stopScan(),
                             icon: const Icon(Icons.stop),
@@ -108,11 +110,16 @@ class _DiskDetailScreenState extends State<DiskDetailScreen> {
           Expanded(
             child: Consumer<DiskService>(
               builder: (context, diskService, child) {
-                if (diskService.isScanning) {
-                  return const Column(
+                if (diskService.scanState == ScanState.scanning) {
+                  return Column(
                     children: [
                       Expanded(
-                        child: ScanProgressWidget(),
+                        child: ScanProgressWidget(
+                          progress: diskService.progress,
+                          currentPath: diskService.currentPath,
+                          scannedItems: diskService.scannedItems,
+                          totalItems: diskService.totalItems,
+                        ),
                       ),
                     ],
                   );

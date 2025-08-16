@@ -8,6 +8,12 @@ abstract class ScanBackend {
   Future<void> pauseScan();
   Future<void> resumeScan();
 
+  // File operations
+  Future<void> showInFolder(String path);
+  Future<void> deleteFileOrFolder(String path, {bool force = false});
+  Future<Map<String, dynamic>> getFileProperties(String path);
+  Future<void> openFile(String path);
+
   bool get isScanning;
   bool get isPaused;
 }

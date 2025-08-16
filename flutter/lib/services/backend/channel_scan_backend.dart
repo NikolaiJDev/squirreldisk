@@ -76,10 +76,57 @@ class ChannelScanBackend implements ScanBackend {
   Future<List<DiskInfo>> getAvailableDisks() async {
     try {
       final result = await _channel.invokeMethod('getDisks');
-      final disks = (result as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
-      return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
+      
+      // Handle the new enhanced format from Windows plugin
+      if (result is Map<String, dynamic>) {
+        final disks = (result['disks'] as List?)?.map((e) => 
+          Map<String, dynamic>.from(e as Map)).toList() ?? [];
+        return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
+      } else {
+        // Fallback for old format
+        final disks = (result as List?)?.map((e) => 
+          Map<String, dynamic>.from(e as Map)).toList() ?? [];
+        return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
+      }
     } on PlatformException catch (e) {
       throw DiskServiceError('Failed to get available disks: ${e.message}');
+    }
+  }
+
+  // Add new methods for enhanced Windows plugin functionality
+  Future<void> showInFolder(String path) async {
+    try {
+      await _channel.invokeMethod('showInFolder', {'path': path});
+    } on PlatformException catch (e) {
+      throw DiskServiceError('Failed to show in folder: ${e.message}');
+    }
+  }
+
+  Future<void> deleteFileOrFolder(String path, {bool force = false}) async {
+    try {
+      await _channel.invokeMethod('deleteFileOrFolder', {
+        'path': path,
+        'force': force,
+      });
+    } on PlatformException catch (e) {
+      throw DiskServiceError('Failed to delete file/folder: ${e.message}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getFileProperties(String path) async {
+    try {
+      final result = await _channel.invokeMethod('getFileProperties', {'path': path});
+      return Map<String, dynamic>.from(result as Map);
+    } on PlatformException catch (e) {
+      throw DiskServiceError('Failed to get file properties: ${e.message}');
+    }
+  }
+
+  Future<void> openFile(String path) async {
+    try {
+      await _channel.invokeMethod('openFile', {'path': path});
+    } on PlatformException catch (e) {
+      throw DiskServiceError('Failed to open file: ${e.message}');
     }
   }
 

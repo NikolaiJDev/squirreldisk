@@ -143,6 +143,12 @@ namespace squirreldisk_windows {
         void ShowInFolder(const flutter::EncodableValue *arguments,
                           std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
         void GetScanStatistics(std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+        void DeleteFileOrFolder(const flutter::EncodableValue *arguments,
+                               std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+        void GetFileProperties(const flutter::EncodableValue *arguments,
+                              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
+        void OpenFile(const flutter::EncodableValue *arguments,
+                     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result);
 
         // Оптимизированные методы сканирования
         flutter::EncodableList ScanDirectory(const std::string& path, int max_depth, int current_depth,

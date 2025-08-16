@@ -6,6 +6,7 @@
 #include <vector>
 #include <windows.h>
 #include <shlwapi.h>
+#include <shlobj.h>
 #include <iostream>
 #include <chrono>
 #include <ctime>
@@ -180,6 +181,12 @@ void SquirrelDiskPlugin::HandleMethodCall(
         ShowInFolder(method_call.arguments(), std::move(result));
     } else if (method == "getScanStatistics") {
         GetScanStatistics(std::move(result));
+    } else if (method == "deleteFileOrFolder") {
+        DeleteFileOrFolder(method_call.arguments(), std::move(result));
+    } else if (method == "getFileProperties") {
+        GetFileProperties(method_call.arguments(), std::move(result));
+    } else if (method == "openFile") {
+        OpenFile(method_call.arguments(), std::move(result));
     } else {
         result->NotImplemented();
     }
@@ -231,70 +238,178 @@ void SquirrelDiskPlugin::GetDiskInfo(const flutter::EncodableValue *arguments,
 void SquirrelDiskPlugin::GetDisks(std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
     flutter::EncodableList disk_list;
 
-    DWORD drives = GetLogicalDrives();
-    for (char drive = 'A'; drive <= 'Z'; ++drive) {
-        if (drives & (1 << (drive - 'A'))) {
-            std::string drive_path = std::string(1, drive) + ":\\";
+    try {
+        DWORD drives = GetLogicalDrives();
+        for (char drive = 'A'; drive <= 'Z'; ++drive) {
+            if (drives & (1 << (drive - 'A'))) {
+                std::string drive_path = std::string(1, drive) + ":\\";
 
-            UINT drive_type = GetDriveTypeA(drive_path.c_str());
-            std::string type_name;
+                // Проверим, доступен ли диск
+                DWORD sectors_per_cluster, bytes_per_sector, free_clusters, total_clusters;
+                if (!GetDiskFreeSpaceA(drive_path.c_str(), &sectors_per_cluster, &bytes_per_sector, &free_clusters, &total_clusters)) {
+                    // Диск недоступен, пропускаем
+                    continue;
+                }
 
-            switch (drive_type) {
-                case DRIVE_FIXED: type_name = "fixed"; break;
-                case DRIVE_REMOVABLE: type_name = "removable"; break;
-                case DRIVE_REMOTE: type_name = "network"; break;
-                case DRIVE_CDROM: type_name = "cdrom"; break;
-                case DRIVE_RAMDISK: type_name = "ramdisk"; break;
-                default: type_name = "unknown"; break;
+                UINT drive_type = GetDriveTypeA(drive_path.c_str());
+                std::string type_name;
+                std::string drive_icon;
+
+                switch (drive_type) {
+                    case DRIVE_FIXED: 
+                        type_name = "fixed"; 
+                        drive_icon = "storage";
+                        break;
+                    case DRIVE_REMOVABLE: 
+                        type_name = "removable"; 
+                        drive_icon = "usb";
+                        break;
+                    case DRIVE_REMOTE: 
+                        type_name = "network"; 
+                        drive_icon = "lan";
+                        break;
+                    case DRIVE_CDROM: 
+                        type_name = "cdrom"; 
+                        drive_icon = "album";
+                        break;
+                    case DRIVE_RAMDISK: 
+                        type_name = "ramdisk"; 
+                        drive_icon = "memory";
+                        break;
+                    default: 
+                        type_name = "unknown"; 
+                        drive_icon = "storage";
+                        break;
+                }
+
+                // Получение расширенной информации о диске
+                std::string disk_label;
+                std::string file_system;
+                std::string serial_number;
+                wchar_t volume_name[MAX_PATH + 1] = {0};
+                wchar_t file_system_name[MAX_PATH + 1] = {0};
+                DWORD volume_serial = 0;
+                DWORD max_component_length = 0;
+                DWORD file_system_flags = 0;
+
+                std::wstring wide_drive_path = StringToWString(drive_path);
+
+                bool volume_info_success = GetVolumeInformationW(
+                    wide_drive_path.c_str(),
+                    volume_name, MAX_PATH + 1,
+                    &volume_serial,
+                    &max_component_length,
+                    &file_system_flags,
+                    file_system_name, MAX_PATH + 1
+                );
+
+                if (volume_info_success) {
+                    disk_label = WStringToString(std::wstring(volume_name));
+                    file_system = WStringToString(std::wstring(file_system_name));
+                    
+                    // Форматируем серийный номер
+                    std::stringstream ss;
+                    ss << std::hex << std::uppercase << volume_serial;
+                    serial_number = ss.str();
+                }
+
+                // Если метка диска пустая, создадим стандартную
+                if (disk_label.empty()) {
+                    if (drive_type == DRIVE_REMOVABLE) {
+                        disk_label = "Removable Disk (" + std::string(1, drive) + ":)";
+                    } else if (drive_type == DRIVE_CDROM) {
+                        disk_label = "DVD Drive (" + std::string(1, drive) + ":)";
+                    } else if (drive_type == DRIVE_NETWORK) {
+                        disk_label = "Network Drive (" + std::string(1, drive) + ":)";
+                    } else {
+                        // Определяем тип по букве диска для системных дисков
+                        if (drive == 'C') {
+                            disk_label = "Windows (" + std::string(1, drive) + ":)";
+                        } else if (drive >= 'D' && drive <= 'Z') {
+                            disk_label = "Local Disk (" + std::string(1, drive) + ":)";
+                        } else {
+                            disk_label = "Disk " + std::string(1, drive);
+                        }
+                    }
+                }
+
+                if (file_system.empty()) {
+                    file_system = "Unknown";
+                }
+
+                // Создаем информацию о диске
+                flutter::EncodableMap disk_info;
+                disk_info[flutter::EncodableValue("name")] = flutter::EncodableValue(disk_label);
+                disk_info[flutter::EncodableValue("mountPoint")] = flutter::EncodableValue(drive_path);
+                disk_info[flutter::EncodableValue("type")] = flutter::EncodableValue(type_name);
+                disk_info[flutter::EncodableValue("fileSystem")] = flutter::EncodableValue(file_system);
+                disk_info[flutter::EncodableValue("icon")] = flutter::EncodableValue(drive_icon);
+                disk_info[flutter::EncodableValue("serialNumber")] = flutter::EncodableValue(serial_number);
+                disk_info[flutter::EncodableValue("driveLetter")] = flutter::EncodableValue(std::string(1, drive));
+
+                // Получаем точную информацию о месте на диске
+                ULARGE_INTEGER free_bytes_available, total_bytes, free_bytes;
+                if (GetDiskFreeSpaceExA(drive_path.c_str(), &free_bytes_available, &total_bytes, &free_bytes)) {
+                    int64_t total_space = static_cast<int64_t>(total_bytes.QuadPart);
+                    int64_t free_space = static_cast<int64_t>(free_bytes.QuadPart);
+                    int64_t available_space = static_cast<int64_t>(free_bytes_available.QuadPart);
+                    int64_t used_space = total_space - free_space;
+
+                    disk_info[flutter::EncodableValue("totalSpace")] = flutter::EncodableValue(total_space);
+                    disk_info[flutter::EncodableValue("freeSpace")] = flutter::EncodableValue(free_space);
+                    disk_info[flutter::EncodableValue("availableSpace")] = flutter::EncodableValue(available_space);
+                    disk_info[flutter::EncodableValue("usedSpace")] = flutter::EncodableValue(used_space);
+                    
+                    // Вычисляем процент использования
+                    double usage_percentage = total_space > 0 ? (static_cast<double>(used_space) / total_space) * 100.0 : 0.0;
+                    disk_info[flutter::EncodableValue("usagePercentage")] = flutter::EncodableValue(usage_percentage);
+                } else {
+                    disk_info[flutter::EncodableValue("totalSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
+                    disk_info[flutter::EncodableValue("freeSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
+                    disk_info[flutter::EncodableValue("availableSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
+                    disk_info[flutter::EncodableValue("usedSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
+                    disk_info[flutter::EncodableValue("usagePercentage")] = flutter::EncodableValue(0.0);
+                }
+
+                // Дополнительные свойства диска
+                disk_info[flutter::EncodableValue("isReady")] = flutter::EncodableValue(true);
+                disk_info[flutter::EncodableValue("isSystemDrive")] = flutter::EncodableValue(drive == 'C');
+                disk_info[flutter::EncodableValue("maxComponentLength")] = flutter::EncodableValue(static_cast<int64_t>(max_component_length));
+                
+                // Флаги файловой системы
+                flutter::EncodableMap fs_features;
+                fs_features[flutter::EncodableValue("supportsCompression")] = flutter::EncodableValue((file_system_flags & FILE_FILE_COMPRESSION) != 0);
+                fs_features[flutter::EncodableValue("supportsEncryption")] = flutter::EncodableValue((file_system_flags & FILE_SUPPORTS_ENCRYPTION) != 0);
+                fs_features[flutter::EncodableValue("supportsVolumeQuotas")] = flutter::EncodableValue((file_system_flags & FILE_VOLUME_QUOTAS) != 0);
+                fs_features[flutter::EncodableValue("supportsCaseSensitive")] = flutter::EncodableValue((file_system_flags & FILE_CASE_SENSITIVE_SEARCH) != 0);
+                disk_info[flutter::EncodableValue("fileSystemFeatures")] = flutter::EncodableValue(fs_features);
+
+                disk_list.push_back(flutter::EncodableValue(disk_info));
             }
-
-            // Получение метки диска и файловой системы
-            std::string disk_label;
-            std::string file_system;
-            wchar_t volume_name[MAX_PATH + 1] = {0};
-            wchar_t file_system_name[MAX_PATH + 1] = {0};
-            std::wstring wide_drive_path = StringToWString(drive_path);
-
-            if (GetVolumeInformationW(wide_drive_path.c_str(), volume_name, MAX_PATH + 1,
-                                      nullptr, nullptr, nullptr, file_system_name, MAX_PATH + 1)) {
-                disk_label = WStringToString(std::wstring(volume_name));
-                file_system = WStringToString(std::wstring(file_system_name));
-            }
-
-            if (disk_label.empty()) {
-                disk_label = "Local Disk (" + std::string(1, drive) + ":)";
-            }
-
-            if (file_system.empty()) {
-                file_system = "Unknown";
-            }
-
-            flutter::EncodableMap disk_info;
-            disk_info[flutter::EncodableValue("name")] = flutter::EncodableValue(disk_label);
-            disk_info[flutter::EncodableValue("mountPoint")] = flutter::EncodableValue(drive_path);
-            disk_info[flutter::EncodableValue("type")] = flutter::EncodableValue(type_name);
-            disk_info[flutter::EncodableValue("fileSystem")] = flutter::EncodableValue(file_system);
-
-            ULARGE_INTEGER free_bytes, total_bytes;
-            if (GetDiskFreeSpaceExA(drive_path.c_str(), &free_bytes, &total_bytes, nullptr)) {
-                int64_t total_space = static_cast<int64_t>(total_bytes.QuadPart);
-                int64_t free_space = static_cast<int64_t>(free_bytes.QuadPart);
-                int64_t used_space = total_space - free_space;
-
-                disk_info[flutter::EncodableValue("totalSpace")] = flutter::EncodableValue(total_space);
-                disk_info[flutter::EncodableValue("freeSpace")] = flutter::EncodableValue(free_space);
-                disk_info[flutter::EncodableValue("usedSpace")] = flutter::EncodableValue(used_space);
-            } else {
-                disk_info[flutter::EncodableValue("totalSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
-                disk_info[flutter::EncodableValue("freeSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
-                disk_info[flutter::EncodableValue("usedSpace")] = flutter::EncodableValue(static_cast<int64_t>(0));
-            }
-
-            disk_list.push_back(flutter::EncodableValue(disk_info));
         }
-    }
 
-    result->Success(flutter::EncodableValue(disk_list));
+        // Добавляем информацию о системе
+        flutter::EncodableMap system_info;
+        
+        // Информация о памяти
+        MEMORYSTATUSEX mem_status;
+        mem_status.dwLength = sizeof(mem_status);
+        if (GlobalMemoryStatusEx(&mem_status)) {
+            system_info[flutter::EncodableValue("totalMemory")] = flutter::EncodableValue(static_cast<int64_t>(mem_status.ullTotalPhys));
+            system_info[flutter::EncodableValue("availableMemory")] = flutter::EncodableValue(static_cast<int64_t>(mem_status.ullAvailPhys));
+            system_info[flutter::EncodableValue("memoryUsagePercentage")] = flutter::EncodableValue(static_cast<double>(mem_status.dwMemoryLoad));
+        }
+
+        // Добавляем системную информацию в результат
+        flutter::EncodableMap response;
+        response[flutter::EncodableValue("disks")] = flutter::EncodableValue(disk_list);
+        response[flutter::EncodableValue("systemInfo")] = flutter::EncodableValue(system_info);
+
+        result->Success(flutter::EncodableValue(response));
+
+    } catch (const std::exception& e) {
+        result->Error("DISK_ENUMERATION_ERROR", std::string("Failed to enumerate disks: ") + e.what());
+    }
 }
 
 void SquirrelDiskPlugin::PauseScan(std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -845,6 +960,245 @@ flutter::EncodableList SquirrelDiskPlugin::ScanDirectoryFast(
     }
 
     return items;
+}
+
+void SquirrelDiskPlugin::DeleteFileOrFolder(const flutter::EncodableValue* arguments,
+                                          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    if (!arguments) {
+        result->Error("INVALID_ARGUMENT", "Arguments cannot be null");
+        return;
+    }
+
+    const auto* args = std::get_if<flutter::EncodableMap>(arguments);
+    if (!args) {
+        result->Error("INVALID_ARGUMENT", "Arguments must be a map");
+        return;
+    }
+
+    auto path_it = args->find(flutter::EncodableValue("path"));
+    if (path_it == args->end()) {
+        result->Error("MISSING_ARGUMENT", "Missing 'path' argument");
+        return;
+    }
+
+    const std::string* path = std::get_if<std::string>(&path_it->second);
+    if (!path || path->empty()) {
+        result->Error("INVALID_ARGUMENT", "'path' must be a non-empty string");
+        return;
+    }
+
+    // Check if force deletion is requested
+    bool force_delete = false;
+    auto force_it = args->find(flutter::EncodableValue("force"));
+    if (force_it != args->end()) {
+        const bool* force_ptr = std::get_if<bool>(&force_it->second);
+        if (force_ptr) {
+            force_delete = *force_ptr;
+        }
+    }
+
+    try {
+        std::filesystem::path fs_path(*path);
+        std::error_code ec;
+
+        // Check if path exists
+        if (!std::filesystem::exists(fs_path, ec)) {
+            result->Error("PATH_NOT_FOUND", "Path does not exist: " + *path);
+            return;
+        }
+
+        // Prepare for deletion
+        bool success = false;
+        std::string error_message;
+
+        if (force_delete) {
+            // Force deletion - remove all files and folders recursively
+            if (std::filesystem::is_directory(fs_path, ec)) {
+                success = std::filesystem::remove_all(fs_path, ec) > 0;
+            } else {
+                success = std::filesystem::remove(fs_path, ec);
+            }
+            
+            if (!success && ec) {
+                error_message = ec.message();
+            }
+        } else {
+            // Safe deletion - move to recycle bin using Windows API
+            std::wstring wide_path = StringToWString(*path);
+            
+            // Add double null terminator required by SHFileOperation
+            wide_path.push_back(L'\0');
+            
+            SHFILEOPSTRUCTW file_op = {};
+            file_op.wFunc = FO_DELETE;
+            file_op.pFrom = wide_path.c_str();
+            file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT;
+            
+            int shell_result = SHFileOperationW(&file_op);
+            success = (shell_result == 0 && !file_op.fAnyOperationsAborted);
+            
+            if (!success) {
+                error_message = "Shell operation failed with code: " + std::to_string(shell_result);
+            }
+        }
+
+        if (success) {
+            flutter::EncodableMap response;
+            response[flutter::EncodableValue("success")] = flutter::EncodableValue(true);
+            response[flutter::EncodableValue("path")] = flutter::EncodableValue(*path);
+            response[flutter::EncodableValue("method")] = flutter::EncodableValue(force_delete ? "permanent" : "recycle_bin");
+            result->Success(flutter::EncodableValue(response));
+        } else {
+            result->Error("DELETE_FAILED", 
+                         "Failed to delete path: " + *path + 
+                         (error_message.empty() ? "" : " (" + error_message + ")"));
+        }
+
+    } catch (const std::exception& e) {
+        result->Error("DELETE_ERROR", std::string("Delete operation failed: ") + e.what());
+    }
+}
+
+void SquirrelDiskPlugin::GetFileProperties(const flutter::EncodableValue* arguments,
+                                         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    if (!arguments) {
+        result->Error("INVALID_ARGUMENT", "Arguments cannot be null");
+        return;
+    }
+
+    const auto* args = std::get_if<flutter::EncodableMap>(arguments);
+    if (!args) {
+        result->Error("INVALID_ARGUMENT", "Arguments must be a map");
+        return;
+    }
+
+    auto path_it = args->find(flutter::EncodableValue("path"));
+    if (path_it == args->end()) {
+        result->Error("MISSING_ARGUMENT", "Missing 'path' argument");
+        return;
+    }
+
+    const std::string* path = std::get_if<std::string>(&path_it->second);
+    if (!path || path->empty()) {
+        result->Error("INVALID_ARGUMENT", "'path' must be a non-empty string");
+        return;
+    }
+
+    try {
+        std::filesystem::path fs_path(*path);
+        std::error_code ec;
+
+        if (!std::filesystem::exists(fs_path, ec)) {
+            result->Error("PATH_NOT_FOUND", "Path does not exist: " + *path);
+            return;
+        }
+
+        flutter::EncodableMap properties;
+        properties[flutter::EncodableValue("path")] = flutter::EncodableValue(*path);
+        properties[flutter::EncodableValue("name")] = flutter::EncodableValue(fs_path.filename().string());
+        properties[flutter::EncodableValue("extension")] = flutter::EncodableValue(fs_path.extension().string());
+        
+        bool is_directory = std::filesystem::is_directory(fs_path, ec);
+        properties[flutter::EncodableValue("isDirectory")] = flutter::EncodableValue(is_directory);
+        properties[flutter::EncodableValue("isFile")] = flutter::EncodableValue(!is_directory);
+        properties[flutter::EncodableValue("isHidden")] = flutter::EncodableValue(IsHidden(fs_path));
+        properties[flutter::EncodableValue("isSystem")] = flutter::EncodableValue(IsSystem(fs_path));
+        properties[flutter::EncodableValue("isReadOnly")] = flutter::EncodableValue(IsReadOnly(fs_path));
+
+        // Get file times
+        auto write_time = std::filesystem::last_write_time(fs_path, ec);
+        if (!ec) {
+            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                write_time - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now()
+            );
+            auto time_t_value = std::chrono::system_clock::to_time_t(sctp);
+            properties[flutter::EncodableValue("lastModified")] = flutter::EncodableValue(static_cast<int64_t>(time_t_value) * 1000);
+        }
+
+        // Get file size
+        if (is_directory) {
+            // Calculate directory size
+            uint64_t total_size = 0;
+            uint64_t file_count = 0;
+            uint64_t dir_count = 0;
+
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(fs_path, ec)) {
+                if (ec) break;
+                
+                if (entry.is_regular_file(ec)) {
+                    total_size += entry.file_size(ec);
+                    file_count++;
+                } else if (entry.is_directory(ec)) {
+                    dir_count++;
+                }
+            }
+
+            properties[flutter::EncodableValue("size")] = flutter::EncodableValue(static_cast<int64_t>(total_size));
+            properties[flutter::EncodableValue("fileCount")] = flutter::EncodableValue(static_cast<int64_t>(file_count));
+            properties[flutter::EncodableValue("directoryCount")] = flutter::EncodableValue(static_cast<int64_t>(dir_count));
+        } else {
+            auto file_size = std::filesystem::file_size(fs_path, ec);
+            if (!ec) {
+                properties[flutter::EncodableValue("size")] = flutter::EncodableValue(static_cast<int64_t>(file_size));
+            }
+        }
+
+        // Get parent directory
+        if (fs_path.has_parent_path()) {
+            properties[flutter::EncodableValue("parentPath")] = flutter::EncodableValue(fs_path.parent_path().string());
+        }
+
+        result->Success(flutter::EncodableValue(properties));
+
+    } catch (const std::exception& e) {
+        result->Error("PROPERTIES_ERROR", std::string("Failed to get file properties: ") + e.what());
+    }
+}
+
+void SquirrelDiskPlugin::OpenFile(const flutter::EncodableValue* arguments,
+                                std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    if (!arguments) {
+        result->Error("INVALID_ARGUMENT", "Arguments cannot be null");
+        return;
+    }
+
+    const auto* args = std::get_if<flutter::EncodableMap>(arguments);
+    if (!args) {
+        result->Error("INVALID_ARGUMENT", "Arguments must be a map");
+        return;
+    }
+
+    auto path_it = args->find(flutter::EncodableValue("path"));
+    if (path_it == args->end()) {
+        result->Error("MISSING_ARGUMENT", "Missing 'path' argument");
+        return;
+    }
+
+    const std::string* path = std::get_if<std::string>(&path_it->second);
+    if (!path || path->empty()) {
+        result->Error("INVALID_ARGUMENT", "'path' must be a non-empty string");
+        return;
+    }
+
+    try {
+        std::wstring wide_path = StringToWString(*path);
+        
+        // Use ShellExecute to open the file with the default application
+        HINSTANCE hr = ShellExecuteW(nullptr, L"open", wide_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        
+        if (reinterpret_cast<intptr_t>(hr) > 32) {
+            flutter::EncodableMap response;
+            response[flutter::EncodableValue("success")] = flutter::EncodableValue(true);
+            response[flutter::EncodableValue("path")] = flutter::EncodableValue(*path);
+            result->Success(flutter::EncodableValue(response));
+        } else {
+            std::string error_message = "Failed to open file. Error code: " + std::to_string(reinterpret_cast<intptr_t>(hr));
+            result->Error("OPEN_FILE_ERROR", error_message);
+        }
+
+    } catch (const std::exception& e) {
+        result->Error("OPEN_FILE_ERROR", std::string("Failed to open file: ") + e.what());
+    }
 }
 
 } // namespace squirreldisk_windows

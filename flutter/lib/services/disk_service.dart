@@ -160,6 +160,50 @@ class DiskService extends ChangeNotifier {
     return '${size.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
   }
 
+  // File operation methods
+  Future<void> showInFolder(String path) async {
+    try {
+      await _scanBackend.showInFolder(path);
+    } catch (e) {
+      _error = 'Failed to show in folder: ${e.toString()}';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteFileOrFolder(String path, {bool force = false}) async {
+    try {
+      await _scanBackend.deleteFileOrFolder(path, force: force);
+      // Remove the item from scan results if it exists
+      _scanResults.removeWhere((item) => item.path == path);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to delete file/folder: ${e.toString()}';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getFileProperties(String path) async {
+    try {
+      return await _scanBackend.getFileProperties(path);
+    } catch (e) {
+      _error = 'Failed to get file properties: ${e.toString()}';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> openFile(String path) async {
+    try {
+      await _scanBackend.openFile(path);
+    } catch (e) {
+      _error = 'Failed to open file: ${e.toString()}';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   @override
   void dispose() {
     _scanSubscription?.cancel();

@@ -3,367 +3,236 @@ import 'package:provider/provider.dart';
 
 import '../services/disk_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/disk_item_widget.dart';
-import '../widgets/custom_folder_picker.dart';
-import '../widgets/scan_progress_widget.dart';
-import '../widgets/optimized_disk_item_widget.dart';
+import '../widgets/enhanced_disk_list_widget.dart';
+import '../widgets/enhanced_scan_progress_widget.dart';
+import '../widgets/enhanced_results_view.dart';
 import '../enums/scan_state.dart';
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
   @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DiskService>().initialize();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return Consumer<DiskService>(
+      builder: (context, diskService, child) {
+        // Show scanning progress if scanning
+        if (diskService.isScanning) {
+          return EnhancedScanProgressWidget(
+            diskName: _getCurrentScanningDisk(diskService),
+            currentPath: diskService.currentPath ?? '',
+            progress: diskService.progress,
+            onCancel: () => diskService.cancelScan(),
+          );
+        }
+
+        // Show results if scan is completed
+        if (diskService.scanState == ScanState.completed && 
+            diskService.scanResults.isNotEmpty) {
+          return EnhancedResultsView(
+            diskName: _getCurrentScanningDisk(diskService),
+            items: diskService.scanResults,
+            onBack: () => diskService.clearResults(),
+          );
+        }
+
+        // Show main disk list
+        return _buildMainDiskView(context, diskService);
+      },
+    );
+  }
+
+  Widget _buildMainDiskView(BuildContext context, DiskService diskService) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('SquirrelDisk - Анализатор дисков'),
-        actions: [
-          Consumer<DiskService>(
-            builder: (context, diskService, child) {
-              return PopupMenuButton<String>(
-                onSelected: (value) => _handleMenuAction(context, diskService, value),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'refresh',
-                    child: ListTile(
-                      leading: Icon(Icons.refresh),
-                      title: Text('Обновить диски'),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top bar with close button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Empty space for symmetry
+                  const SizedBox(width: 40),
+                  
+                  // Version info
+                  Text(
+                    'v. 0.3.4',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[500],
                     ),
                   ),
-                  if (diskService.isScanning) ...[
-                    const PopupMenuItem(
-                      value: 'pause',
-                      child: ListTile(
-                        leading: Icon(Icons.pause),
-                        title: Text('Приостановить'),
-                      ),
+                  
+                  // Close button
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24,
                     ),
-                    const PopupMenuItem(
-                      value: 'stop',
-                      child: ListTile(
-                        leading: Icon(Icons.stop),
-                        title: Text('Остановить'),
-                      ),
-                    ),
-                  ],
-                  if (diskService.isPaused)
-                    const PopupMenuItem(
-                      value: 'resume',
-                      child: ListTile(
-                        leading: Icon(Icons.play_arrow),
-                        title: Text('Продолжить'),
-                      ),
-                    ),
-                  if (diskService.scanResults.isNotEmpty)
-                    const PopupMenuItem(
-                      value: 'clear',
-                      child: ListTile(
-                        leading: Icon(Icons.clear),
-                        title: Text('Очистить результаты'),
-                      ),
-                    ),
+                    tooltip: 'Close',
+                  ),
                 ],
-              );
-            },
-          ),
-        ],
-      ),
-      body: Consumer<DiskService>(
-        builder: (context, diskService, child) {
-          if (diskService.error != null) {
-            return _buildErrorWidget(context, diskService);
-          }
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 800) {
-                return _buildTabletLayout(context, diskService);
-              }
-              return _buildMobileLayout(context, diskService);
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildMobileLayout(BuildContext context, DiskService diskService) {
-    return Column(
-      children: [
-        if (diskService.scanState == ScanState.idle ||
-            diskService.scanResults.isEmpty) ...[
-          Expanded(
-            child: _buildDiskListWidget(context, diskService),
-          ),
-        ] else ...[
-          Expanded(
-            child: _buildScanResultsWidget(context, diskService),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildTabletLayout(BuildContext context, DiskService diskService) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 1,
-          child: _buildDiskListWidget(context, diskService),
-        ),
-        Expanded(
-          flex: 2,
-          child: _buildScanResultsWidget(context, diskService),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDiskListWidget(BuildContext context, DiskService diskService) {
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-               Icon(
-                Icons.storage,
-                color: Colors.deepPurple[300],
-                size: 32,
               ),
-              const SizedBox(width: 12),
+            ),
+
+            // Error handling
+            if (diskService.error != null)
+              _buildErrorWidget(context, diskService)
+            else
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Доступные диски',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    Text(
-                      'Выберите диск для анализа',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+                child: EnhancedDiskListWidget(
+                  disks: diskService.disks,
+                  onDiskTap: (disk) => _handleDiskTap(context, diskService, disk),
+                  onScanTap: (disk) => _handleScanTap(context, diskService, disk),
                 ),
               ),
-              IconButton(
-                onPressed: () => diskService.refreshDisks(),
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Обновить список дисков',
-              ),
-            ],
-          ),
-        ),
 
-        // Disk list
-        Expanded(
-          child: diskService.isLoading
-              ? const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Загрузка дисков...'),
-              ],
-            ),
-          )
-              : diskService.disks.isEmpty
-              ? const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.storage_outlined,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-                SizedBox(height: 16),
-                Text('Диски не найдены'),
-              ],
-            ),
-          )
-              : ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: diskService.disks.length + 1, // +1 for folder picker
-            itemBuilder: (context, index) {
-              if (index == diskService.disks.length) {
-                return const CustomFolderPickerWidget();
-              }
-
-              final disk = diskService.disks[index];
-              return DiskItemWidget(
-                disk: disk,
-                onTap: () => diskService.startScan(disk.mountPoint),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScanResultsWidget(BuildContext context, DiskService diskService) {
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.grey.shade300),
-            ),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                onPressed: () => diskService.clearResults(),
-                icon: const Icon(Icons.arrow_back),
-                tooltip: 'Назад к списку дисков',
-              ),
-              Expanded(
-                child: Text(
-                  'Результаты сканирования',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              Text(
-                '${diskService.scanResults.length} элементов',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-
-        // Progress indicator during scanning
-        if (diskService.scanState == ScanState.scanning)
-          ScanProgressWidget(
-            progress: diskService.progress,
-            currentPath: diskService.currentPath,
-            scannedItems: diskService.scannedItems,
-            totalItems: diskService.totalItems,
-            onCancel: () => diskService.stopScan(),
-            onPause: () => diskService.pauseScan(),
-          ),
-
-        // Pause state indicator
-        if (diskService.scanState == ScanState.paused)
-          Card(
-            margin: const EdgeInsets.all(16),
-            color: Colors.orange[50],
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            // Bottom tip
+            Container(
+              padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  Icon(Icons.pause_circle, color: Colors.orange[700]),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Text('Сканирование приостановлено'),
-                  ),
-                  TextButton(
-                    onPressed: () => diskService.resumeScan(),
-                    child: const Text('Продолжить'),
+                  Text(
+                    'Tip: Right Click for a full disk scan (slower)',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[500],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-
-        // Results list
-        Expanded(
-          child: diskService.scanResults.isEmpty && diskService.scanState != ScanState.scanning
-              ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.folder_outlined,
-                  size: 64,
-                  color: Colors.grey.shade400,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Нет результатов сканирования',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-          )
-              : ListView.builder(
-            itemCount: diskService.scanResults.length,
-            itemBuilder: (context, index) {
-              final item = diskService.scanResults[index];
-              return OptimizedDiskItemWidget(
-                item: item,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Выбран: ${item.name}'),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildErrorWidget(BuildContext context, DiskService diskService) {
-    return Center(
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.error_outline,
-            size: 64,
+            size: 48,
             color: Colors.red.shade400,
           ),
           const SizedBox(height: 16),
           Text(
-            'Ошибка',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              diskService.error!,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+            'Error Loading Disks',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            diskService.error!,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey[300],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => diskService.refreshDisks(),
-            child: const Text('Повторить'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retry'),
           ),
         ],
       ),
     );
   }
 
-  void _handleMenuAction(BuildContext context, DiskService diskService, String action) {
-    switch (action) {
-      case 'refresh':
-        diskService.refreshDisks();
-        break;
-      case 'pause':
-        diskService.pauseScan();
-        break;
-      case 'stop':
-        diskService.stopScan();
-        break;
-      case 'resume':
-        diskService.resumeScan();
-        break;
-      case 'clear':
-        diskService.clearResults();
-        break;
+  void _handleDiskTap(BuildContext context, DiskService diskService, dynamic disk) {
+    // Show disk details or quick scan options
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${disk.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Total: ${disk.formattedTotalSpace}'),
+            Text('Free: ${disk.formattedFreeSpace}'),
+            Text('Used: ${disk.formattedUsedSpace}'),
+            Text('Usage: ${disk.usagePercentage.toStringAsFixed(1)}%'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handleScanTap(context, diskService, disk);
+            },
+            child: const Text('Scan'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleScanTap(BuildContext context, DiskService diskService, dynamic disk) {
+    try {
+      diskService.startScan(disk.mountPoint);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error starting scan: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  String _getCurrentScanningDisk(DiskService diskService) {
+    // Try to determine which disk is being scanned from current path
+    if (diskService.currentPath != null && diskService.currentPath!.isNotEmpty) {
+      final path = diskService.currentPath!;
+      if (path.length >= 2 && path[1] == ':') {
+        final driveLetter = path[0].toUpperCase();
+        final disk = diskService.disks.firstWhere(
+          (d) => d.mountPoint.startsWith(driveLetter),
+          orElse: () => diskService.disks.isNotEmpty ? diskService.disks.first : null,
+        );
+        return disk?.name ?? 'Disk ($driveLetter:)';
+      }
+    }
+    
+    // Fallback to first disk or generic name
+    return diskService.disks.isNotEmpty 
+        ? diskService.disks.first.name 
+        : 'Unknown Disk';
   }
 }

@@ -327,7 +327,6 @@ class EnhancedDiskListWidget extends StatelessWidget {
       ),
     );
   }
-  }
 
   void _selectCustomFolder(BuildContext context) {
     // TODO: Implement custom folder picker

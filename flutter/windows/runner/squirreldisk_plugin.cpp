@@ -1,4 +1,5 @@
 #include "squirreldisk_plugin.h"
+#include "logger.h"
 
 #include <filesystem>
 #include <shellapi.h>
@@ -38,6 +39,14 @@ namespace squirreldisk_windows {
     }
 
     void SquirrelDiskPlugin::RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar) {
+        // Initialize logging system first
+        if (!Logger::getInstance().initialize()) {
+            OutputDebugStringA("Failed to initialize logger!");
+        }
+        
+        LOG_INFO("SquirrelDiskPlugin starting registration");
+        LOG_MEMORY("plugin_registration_start");
+        
         auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
                 registrar->messenger(), "squirreldisk",
                         &flutter::StandardMethodCodec::GetInstance());
@@ -76,6 +85,9 @@ namespace squirreldisk_windows {
 
         // Для Windows используем статическое хранение плагина
         static auto saved_plugin = std::move(plugin);
+        
+        LOG_INFO("SquirrelDiskPlugin registration completed successfully");
+        LOG_MEMORY("plugin_registration_complete");
     }
 
     void SquirrelDiskPlugin::RegisterWithMessenger(flutter::BinaryMessenger *messenger) {
@@ -119,9 +131,15 @@ namespace squirreldisk_windows {
         static auto saved_plugin = std::move(plugin);
     }
 
-    SquirrelDiskPlugin::SquirrelDiskPlugin() = default;
+    SquirrelDiskPlugin::SquirrelDiskPlugin() {
+        LOG_INFO("SquirrelDiskPlugin constructor called");
+        LOG_MEMORY("constructor");
+    }
 
-    SquirrelDiskPlugin::~SquirrelDiskPlugin() = default;
+    SquirrelDiskPlugin::~SquirrelDiskPlugin() {
+        LOG_INFO("SquirrelDiskPlugin destructor called");
+        Logger::getInstance().shutdown();
+    }
 
     LRESULT CALLBACK SquirrelDiskPlugin::MsgWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     auto *plugin = reinterpret_cast<SquirrelDiskPlugin *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -164,6 +182,8 @@ void SquirrelDiskPlugin::HandleMethodCall(
         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 
     const auto &method = method_call.method_name();
+    LOG_PLUGIN_CALL(method, "");
+    LOG_MEMORY("method_call_" + method);
 
     if (method == "getDisks") {
         GetDisks(std::move(result));
@@ -188,6 +208,7 @@ void SquirrelDiskPlugin::HandleMethodCall(
     } else if (method == "openFile") {
         OpenFile(method_call.arguments(), std::move(result));
     } else {
+        LOG_WARNING("Unknown method called: " + method);
         result->NotImplemented();
     }
 }
@@ -236,18 +257,24 @@ void SquirrelDiskPlugin::GetDiskInfo(const flutter::EncodableValue *arguments,
 }
 
 void SquirrelDiskPlugin::GetDisks(std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    LOG_OPERATION("GetDisks", "Starting disk enumeration");
+    LOG_MEMORY("get_disks_start");
+    
     flutter::EncodableList disk_list;
 
     try {
         DWORD drives = GetLogicalDrives();
+        LOG_INFO("Found logical drives mask: " + std::to_string(drives));
+        
         for (char drive = 'A'; drive <= 'Z'; ++drive) {
             if (drives & (1 << (drive - 'A'))) {
                 std::string drive_path = std::string(1, drive) + ":\\";
+                LOG_DEBUG("Processing drive: " + drive_path);
 
                 // Проверим, доступен ли диск
                 DWORD sectors_per_cluster, bytes_per_sector, free_clusters, total_clusters;
                 if (!GetDiskFreeSpaceA(drive_path.c_str(), &sectors_per_cluster, &bytes_per_sector, &free_clusters, &total_clusters)) {
-                    // Диск недоступен, пропускаем
+                    LOG_WARNING("Drive " + drive_path + " is not accessible, skipping");
                     continue;
                 }
 
@@ -405,9 +432,13 @@ void SquirrelDiskPlugin::GetDisks(std::unique_ptr<flutter::MethodResult<flutter:
         response[flutter::EncodableValue("disks")] = flutter::EncodableValue(disk_list);
         response[flutter::EncodableValue("systemInfo")] = flutter::EncodableValue(system_info);
 
+        LOG_OPERATION("GetDisks", "Successfully enumerated " + std::to_string(disk_list.size()) + " disks");
+        LOG_MEMORY("get_disks_complete");
+        
         result->Success(flutter::EncodableValue(response));
 
     } catch (const std::exception& e) {
+        LOG_ERROR("Exception in GetDisks: " + std::string(e.what()));
         result->Error("DISK_ENUMERATION_ERROR", std::string("Failed to enumerate disks: ") + e.what());
     }
 }
@@ -437,33 +468,43 @@ void SquirrelDiskPlugin::StartScan(
         const flutter::EncodableValue* arguments,
         std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 
+    LOG_OPERATION("StartScan", "Scan request received");
+
     if (is_scanning_.load()) {
+        LOG_WARNING("StartScan called while scan already in progress");
         result->Error("SCAN_IN_PROGRESS", "A scan is already in progress");
         return;
     }
 
     if (!arguments) {
+        LOG_ERROR("StartScan called with null arguments");
         result->Error("INVALID_ARGUMENT", "Arguments cannot be null");
         return;
     }
 
     const auto* args = std::get_if<flutter::EncodableMap>(arguments);
     if (!args) {
+        LOG_ERROR("StartScan called with invalid arguments type");
         result->Error("INVALID_ARGUMENT", "Arguments must be a map");
         return;
     }
 
     auto path_it = args->find(flutter::EncodableValue("path"));
     if (path_it == args->end()) {
+        LOG_ERROR("StartScan called without path argument");
         result->Error("MISSING_ARGUMENT", "Missing 'path' argument");
         return;
     }
 
     const std::string* path = std::get_if<std::string>(&path_it->second);
     if (!path || path->empty()) {
+        LOG_ERROR("StartScan called with empty path");
         result->Error("INVALID_ARGUMENT", "'path' must be a non-empty string");
         return;
     }
+
+    LOG_OPERATION("StartScan", "Starting scan of path: " + *path);
+    LOG_MEMORY("scan_start");
 
     int max_depth = -1;
     auto depth_it = args->find(flutter::EncodableValue("maxDepth"));
@@ -492,37 +533,80 @@ void SquirrelDiskPlugin::StartScan(
     if (thread_safe_event_sink_) {
         std::thread([this, scan_path = *path, max_depth, include_hidden]() {
             try {
+                LOG_OPERATION("StartScan", "Scan thread started for: " + scan_path);
+                LOG_MEMORY("scan_thread_start");
+                
                 auto send_func = [this](const flutter::EncodableMap& event) {
-                    thread_safe_event_sink_->SendEventSafe(flutter::EncodableValue(event));
-                    PostFlush();
+                    if (thread_safe_event_sink_ && is_scanning_.load()) {
+                        thread_safe_event_sink_->SendEventSafe(flutter::EncodableValue(event));
+                        PostFlush();
+                    }
                 };
 
                 auto items = ScanDirectoryOptimized(scan_path, max_depth, 0, include_hidden, send_func);
 
-                flutter::EncodableMap completion_event;
-                completion_event[flutter::EncodableValue("type")] = flutter::EncodableValue("completed");
-                completion_event[flutter::EncodableValue("totalItems")] = flutter::EncodableValue(static_cast<int64_t>(items.size()));
+                if (is_scanning_.load()) {  // Only send completion if not cancelled
+                    flutter::EncodableMap completion_event;
+                    completion_event[flutter::EncodableValue("type")] = flutter::EncodableValue("completed");
+                    completion_event[flutter::EncodableValue("totalItems")] = flutter::EncodableValue(static_cast<int64_t>(items.size()));
 
-                send_func(completion_event);
+                    send_func(completion_event);
+                    LOG_OPERATION("StartScan", "Scan completed successfully with " + std::to_string(items.size()) + " items");
+                } else {
+                    LOG_OPERATION("StartScan", "Scan was cancelled");
+                }
 
             } catch (const std::exception& e) {
-                flutter::EncodableMap error_event;
-                error_event[flutter::EncodableValue("type")] = flutter::EncodableValue("error");
-                error_event[flutter::EncodableValue("message")] = flutter::EncodableValue(e.what());
+                LOG_ERROR("Exception in scan thread: " + std::string(e.what()));
+                
+                if (thread_safe_event_sink_ && is_scanning_.load()) {
+                    flutter::EncodableMap error_event;
+                    error_event[flutter::EncodableValue("type")] = flutter::EncodableValue("error");
+                    error_event[flutter::EncodableValue("message")] = flutter::EncodableValue(e.what());
 
-                thread_safe_event_sink_->SendEventSafe(flutter::EncodableValue(error_event));
-                PostFlush();
+                    thread_safe_event_sink_->SendEventSafe(flutter::EncodableValue(error_event));
+                    PostFlush();
+                }
+            } catch (...) {
+                LOG_ERROR("Unknown exception in scan thread");
+                
+                if (thread_safe_event_sink_ && is_scanning_.load()) {
+                    flutter::EncodableMap error_event;
+                    error_event[flutter::EncodableValue("type")] = flutter::EncodableValue("error");
+                    error_event[flutter::EncodableValue("message")] = flutter::EncodableValue("Unknown error occurred during scan");
+
+                    thread_safe_event_sink_->SendEventSafe(flutter::EncodableValue(error_event));
+                    PostFlush();
+                }
             }
 
             is_scanning_.store(false);
+            LOG_MEMORY("scan_thread_complete");
+            LOG_OPERATION("StartScan", "Scan thread finished");
         }).detach();
+    } else {
+        LOG_ERROR("thread_safe_event_sink_ is null, cannot start scan");
+        result->Error("INTERNAL_ERROR", "Event sink not available");
+        return;
     }
 
     result->Success();
 }
 
 void SquirrelDiskPlugin::StopScan(std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    LOG_OPERATION("StopScan", "Stop scan requested");
+    LOG_MEMORY("stop_scan");
+    
     is_scanning_.store(false);
+    
+    // Clear cache and batches to free memory
+    ClearCache();
+    {
+        std::lock_guard<std::mutex> lock(batch_mutex_);
+        current_batch_.clear();
+    }
+    
+    LOG_OPERATION("StopScan", "Scan stopped and resources cleaned up");
     result->Success();
 }
 

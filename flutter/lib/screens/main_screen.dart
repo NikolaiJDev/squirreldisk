@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/disk_service.dart';
+import '../services/crash_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/logger.dart';
 import '../widgets/enhanced_disk_list_widget.dart';
 import '../widgets/enhanced_scan_progress_widget.dart';
 import '../widgets/enhanced_results_view.dart';
@@ -19,32 +21,53 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    Logger.instance.info('MainScreen initialized');
+    CrashService.instance.recordUINavigation('app_start', 'main_screen');
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      Logger.instance.info('Initializing disk service from MainScreen');
       context.read<DiskService>().initialize();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    Logger.instance.debug('Building MainScreen widget');
+    
     return Consumer<DiskService>(
       builder: (context, diskService, child) {
         // Show scanning progress if scanning
         if (diskService.isScanning) {
+          Logger.instance.debug('Showing scan progress view');
+          CrashService.instance.recordUINavigation('main_screen', 'scan_progress');
+          
           return EnhancedScanProgressWidget(
             diskName: _getCurrentScanningDisk(diskService),
             currentPath: diskService.currentPath ?? '',
             progress: diskService.progress,
-            onCancel: () => diskService.stopScan(),
+            onCancel: () {
+              Logger.instance.info('User requested scan cancellation');
+              CrashService.instance.recordUserAction('cancel_scan');
+              diskService.stopScan();
+            },
           );
         }
 
         // Show results if scan is completed
         if (diskService.scanState == ScanState.completed && 
             diskService.scanResults.isNotEmpty) {
+          Logger.instance.debug('Showing scan results view');
+          CrashService.instance.recordUINavigation('scan_progress', 'results');
+          
           return EnhancedResultsView(
             diskName: _getCurrentScanningDisk(diskService),
             items: diskService.scanResults,
-            onBack: () => diskService.clearResults(),
+            onBack: () {
+              Logger.instance.info('User navigated back from results');
+              CrashService.instance.recordUserAction('back_to_main');
+              CrashService.instance.recordUINavigation('results', 'main_screen');
+              diskService.clearResults();
+            },
           );
         }
 
@@ -204,9 +227,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _handleScanTap(BuildContext context, DiskService diskService, dynamic disk) {
+    Logger.instance.info('User initiated scan for disk: ${disk.name} (${disk.mountPoint})');
+    CrashService.instance.recordUserAction('start_scan', context: {'disk': disk.name});
+    
     try {
       diskService.startScan(disk.mountPoint);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      Logger.instance.error('Error starting scan for ${disk.name}', e, stackTrace);
+      CrashService.instance.recordUserAction('scan_error', context: {'disk': disk.name, 'error': e.toString()});
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error starting scan: ${e.toString()}'),

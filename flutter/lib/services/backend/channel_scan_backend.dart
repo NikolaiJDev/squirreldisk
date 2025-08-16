@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-import '../../../exceptions/disk_service_error.dart';
-import '../../../models/disk_info.dart';
+import '../../exceptions/disk_service_error.dart';
+import '../../models/disk_info.dart';
 import '../../models/disk_item.dart';
+import '../../utils/logger.dart';
+import '../../services/crash_service.dart';
 import 'interfaces/scan_backend.dart';
 
 class ChannelScanBackend implements ScanBackend {
@@ -23,6 +25,9 @@ class ChannelScanBackend implements ScanBackend {
 
   @override
   Stream<ScanResult> scanDirectory(String path) async* {
+    Logger.instance.debug('ChannelScanBackend.scanDirectory called for path: $path');
+    CrashService.instance.recordPluginCall('startScan', {'path': path});
+    
     if (_isScanning) {
       throw const DiskServiceError('Scan already in progress');
     }
@@ -31,28 +36,41 @@ class ChannelScanBackend implements ScanBackend {
     final controller = StreamController<ScanResult>();
 
     try {
+      Logger.instance.info('Invoking startScan method with path: $path');
       await _channel.invokeMethod('startScan', {'path': path});
 
       _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
-            (event) {
-          final result = _parseEventData(event);
-          if (result != null) {
-            controller.add(result);
+        (event) {
+          try {
+            final result = _parseEventData(event);
+            if (result != null) {
+              controller.add(result);
+            }
+          } catch (e, stackTrace) {
+            Logger.instance.error('Error parsing scan event data', e, stackTrace);
           }
         },
         onError: (error) {
+          Logger.instance.error('Scan event stream error', error);
+          CrashService.instance.recordPluginError('scanDirectory', error);
           controller.addError(DiskServiceError('Platform error: $error'));
         },
         onDone: () {
+          Logger.instance.info('Scan event stream completed');
           controller.close();
         },
       );
 
       yield* controller.stream;
+    } catch (e, stackTrace) {
+      Logger.instance.error('Error in scanDirectory', e, stackTrace);
+      CrashService.instance.recordPluginError('scanDirectory', e);
+      rethrow;
     } finally {
       _isScanning = false;
       await _eventSubscription?.cancel();
       _eventSubscription = null;
+      Logger.instance.debug('Scan directory operation completed');
     }
   }
 
@@ -74,6 +92,9 @@ class ChannelScanBackend implements ScanBackend {
 
   @override
   Future<List<DiskInfo>> getAvailableDisks() async {
+    Logger.instance.debug('ChannelScanBackend.getAvailableDisks called');
+    CrashService.instance.recordPluginCall('getDisks', null);
+    
     try {
       final result = await _channel.invokeMethod('getDisks');
       
@@ -81,14 +102,18 @@ class ChannelScanBackend implements ScanBackend {
       if (result is Map) {
         final disks = (result['disks'] as List?)?.map((e) => 
           Map<String, dynamic>.from(e as Map)).toList() ?? [];
+        Logger.instance.info('Retrieved ${disks.length} disks from plugin (enhanced format)');
         return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
       } else {
         // Fallback for old format
         final disks = (result as List?)?.map((e) => 
           Map<String, dynamic>.from(e as Map)).toList() ?? [];
+        Logger.instance.info('Retrieved ${disks.length} disks from plugin (legacy format)');
         return disks.map((disk) => DiskInfo.fromJson(disk)).toList();
       }
     } on PlatformException catch (e) {
+      Logger.instance.error('Platform error getting disks', e);
+      CrashService.instance.recordPluginError('getDisks', e);
       throw DiskServiceError('Failed to get available disks: ${e.message}');
     }
   }

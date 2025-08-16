@@ -957,39 +957,88 @@ flutter::EncodableList SquirrelDiskPlugin::ScanDirectoryOptimized(
     flutter::EncodableList items;
 
     if (!is_scanning_.load() || (max_depth >= 0 && current_depth >= max_depth)) {
+        LOG_DEBUG("Scan stopped - scanning: " + std::to_string(is_scanning_.load()) + ", depth: " + std::to_string(current_depth));
         return items;
     }
 
+    LOG_DEBUG("Scanning directory: " + path + " (depth: " + std::to_string(current_depth) + ")");
+    LOG_MEMORY("scan_directory_" + std::to_string(current_depth));
+
     try {
         std::error_code ec;
-        for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
-            if (!is_scanning_.load()) break;
+        
+        // Check if path exists and is accessible
+        if (!std::filesystem::exists(path, ec) || ec) {
+            LOG_WARNING("Path does not exist or is not accessible: " + path + " | Error: " + ec.message());
+            return items;
+        }
 
-            if (!include_hidden && IsHidden(entry.path())) {
+        size_t processed_count = 0;
+        
+        for (const auto& entry : std::filesystem::directory_iterator(path, ec)) {
+            if (!is_scanning_.load()) {
+                LOG_DEBUG("Scan cancelled during directory iteration");
+                break;
+            }
+
+            if (ec) {
+                LOG_WARNING("Directory iterator error: " + ec.message());
+                ec.clear();
                 continue;
             }
 
-            FileSystemItem item = CreateFileSystemItem(entry);
-            UpdateScanStatistics(item);
-            AddToBatch(FileSystemItemToMap(item), entry.path().string());
+            try {
+                if (!include_hidden && IsHidden(entry.path())) {
+                    continue;
+                }
 
-            if (current_batch_.items.size() >= BATCH_SIZE) {
-                FlushBatch(send);
-            }
+                FileSystemItem item = CreateFileSystemItem(entry);
+                UpdateScanStatistics(item);
+                AddToBatch(FileSystemItemToMap(item), entry.path().string());
+                processed_count++;
 
-            if (entry.is_directory(ec)) {
-                auto sub_items = ScanDirectoryOptimized(
-                        entry.path().string(), max_depth, current_depth + 1, include_hidden, send);
-                items.insert(items.end(), sub_items.begin(), sub_items.end());
+                if (current_batch_.items.size() >= BATCH_SIZE) {
+                    FlushBatch(send);
+                }
+
+                // Check memory usage periodically
+                if (processed_count % 100 == 0) {
+                    LOG_MEMORY("scan_batch_" + std::to_string(processed_count));
+                }
+
+                if (entry.is_directory(ec) && !ec) {
+                    try {
+                        auto sub_items = ScanDirectoryOptimized(
+                            entry.path().string(), max_depth, current_depth + 1, include_hidden, send);
+                        
+                        // Reserve space to prevent frequent reallocations
+                        items.reserve(items.size() + sub_items.size());
+                        items.insert(items.end(), sub_items.begin(), sub_items.end());
+                    } catch (const std::exception& e) {
+                        LOG_ERROR("Error scanning subdirectory " + entry.path().string() + ": " + e.what());
+                        // Continue with next item instead of failing entire scan
+                    }
+                }
+                
+            } catch (const std::exception& e) {
+                LOG_ERROR("Error processing entry " + entry.path().string() + ": " + e.what());
+                // Continue with next entry
+                continue;
             }
         }
 
         FlushBatch(send);
+        LOG_DEBUG("Completed directory scan: " + path + " (processed " + std::to_string(processed_count) + " items)");
 
     } catch (const std::exception& e) {
+        LOG_ERROR("Exception in ScanDirectoryOptimized for " + path + ": " + e.what());
         SendError("SCAN_ERROR", e.what(), send);
+    } catch (...) {
+        LOG_ERROR("Unknown exception in ScanDirectoryOptimized for " + path);
+        SendError("SCAN_ERROR", "Unknown error occurred during scan", send);
     }
 
+    LOG_MEMORY("scan_directory_complete_" + std::to_string(current_depth));
     return items;
 }
 

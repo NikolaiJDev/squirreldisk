@@ -34,7 +34,7 @@ class _MainScreenState extends State<MainScreen> {
             diskName: _getCurrentScanningDisk(diskService),
             currentPath: diskService.currentPath ?? '',
             progress: diskService.progress,
-            onCancel: () => diskService.cancelScan(),
+            onCancel: () => diskService.stopScan(),
           );
         }
 
@@ -222,10 +222,10 @@ class _MainScreenState extends State<MainScreen> {
       final path = diskService.currentPath!;
       if (path.length >= 2 && path[1] == ':') {
         final driveLetter = path[0].toUpperCase();
-        final disk = diskService.disks.firstWhere(
+        final matchingDisks = diskService.disks.where(
           (d) => d.mountPoint.startsWith(driveLetter),
-          orElse: () => diskService.disks.isNotEmpty ? diskService.disks.first : null,
-        );
+        ).toList();
+        final disk = matchingDisks.isNotEmpty ? matchingDisks.first : null;
         return disk?.name ?? 'Disk ($driveLetter:)';
       }
     }

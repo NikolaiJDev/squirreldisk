@@ -116,8 +116,8 @@ class _EnhancedResultsViewState extends State<EnhancedResultsView>
                       child: AspectRatio(
                         aspectRatio: 1.0,
                         child: SunburstChart(
-                          items: widget.items,
-                          onItemSelected: (item) {
+                          data: widget.items,
+                          onItemTap: (item) {
                             setState(() {
                               _selectedItem = item;
                             });

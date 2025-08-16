@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+import '../utils/logger.dart';
 
 class EnhancedScanProgressWidget extends StatefulWidget {
   final String diskName;
@@ -26,11 +28,13 @@ class _EnhancedScanProgressWidgetState extends State<EnhancedScanProgressWidget>
   @override
   void initState() {
     super.initState();
+    Logger.instance.info('Scan progress widget initialized for disk: ${widget.diskName}');
+    
     _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.repeat(reverse: true);
@@ -44,106 +48,215 @@ class _EnhancedScanProgressWidgetState extends State<EnhancedScanProgressWidget>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    Logger.instance.debug('Building scan progress widget with ${(widget.progress * 100).toStringAsFixed(1)}% progress');
     
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Row(
+      backgroundColor: AppTheme.darkBackground,
+      body: SafeArea(
+        child: Column(
           children: [
-            Icon(
-              Icons.storage,
-              color: Colors.orange,
-              size: 24,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'SquirrelDisk',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+            // Top navigation bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                children: [
+                  // Navigation breadcrumb
+                  _buildBreadcrumb(),
+                  
+                  const Spacer(),
+                  
+                  // Close button
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppTheme.darkText,
+                      size: 24,
+                    ),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 16),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.grey,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'All Disks',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(width: 16),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.grey,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              widget.diskName,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
+
+            // Main content area
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Animated disk icon
+                    AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: _pulseAnimation.value,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: AppTheme.darkCardBackground,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppTheme.darkBorder,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.storage,
+                              size: 64,
+                              color: AppTheme.darkAccent,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 40),
+                    
+                    // Scanning text with percentage
+                    Text(
+                      'Scanning ${widget.diskName} ${(widget.progress * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.darkText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Progress bar
+                    Container(
+                      width: 400,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppTheme.darkSurface,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.darkSurface,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: widget.progress,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppTheme.darkAccent,
+                                borderRadius: BorderRadius.circular(4),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.darkAccent,
+                                    AppTheme.darkAccent.withValues(alpha: 0.8),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 40),
+                    
+                    // Cancel button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.darkSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.darkBorder),
+                      ),
+                      child: TextButton(
+                        onPressed: widget.onCancel,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          'Back',
+                          style: TextStyle(
+                            color: AppTheme.darkText,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Animated disk icon
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: theme.primaryColor.withValues(alpha: 0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.storage,
-                      size: 64,
-                      color: theme.primaryColor,
-                    ),
-                  ),
-                );
-              },
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Scanning text with percentage
-            Text(
-              'Scanning ${widget.diskName} ${(widget.progress * 100).toStringAsFixed(1)}%',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+    );
+  }
+
+  Widget _buildBreadcrumb() {
+    return Row(
+      children: [
+        Icon(
+          Icons.storage,
+          color: Colors.orange.shade600,
+          size: 20,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'SquirrelDisk',
+          style: TextStyle(
+            color: AppTheme.darkText,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Icon(
+          Icons.chevron_right,
+          color: AppTheme.darkSubtext,
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'All Disks',
+          style: TextStyle(
+            color: AppTheme.darkSubtext,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Icon(
+          Icons.chevron_right,
+          color: AppTheme.darkSubtext,
+          size: 16,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          widget.diskName,
+          style: TextStyle(
+            color: AppTheme.darkText,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
               ),
             ),
             

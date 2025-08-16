@@ -138,7 +138,25 @@ namespace squirreldisk_windows {
 
     SquirrelDiskPlugin::~SquirrelDiskPlugin() {
         LOG_INFO("SquirrelDiskPlugin destructor called");
+        
+        // Ensure scanning is stopped
+        is_scanning_.store(false);
+        
+        // Clear cache and batches
+        ClearCache();
+        {
+            std::lock_guard<std::mutex> lock(batch_mutex_);
+            current_batch_.clear();
+        }
+        
+        // Clean up message window
+        if (msg_hwnd_) {
+            DestroyWindow(msg_hwnd_);
+            msg_hwnd_ = nullptr;
+        }
+        
         Logger::getInstance().shutdown();
+        LOG_INFO("SquirrelDiskPlugin destructor complete");
     }
 
     LRESULT CALLBACK SquirrelDiskPlugin::MsgWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -1097,25 +1115,31 @@ flutter::EncodableList SquirrelDiskPlugin::ScanDirectoryFast(
 
 void SquirrelDiskPlugin::DeleteFileOrFolder(const flutter::EncodableValue* arguments,
                                           std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+    LOG_OPERATION("DeleteFileOrFolder", "Delete operation requested");
+    
     if (!arguments) {
+        LOG_ERROR("DeleteFileOrFolder called with null arguments");
         result->Error("INVALID_ARGUMENT", "Arguments cannot be null");
         return;
     }
 
     const auto* args = std::get_if<flutter::EncodableMap>(arguments);
     if (!args) {
+        LOG_ERROR("DeleteFileOrFolder called with invalid arguments type");
         result->Error("INVALID_ARGUMENT", "Arguments must be a map");
         return;
     }
 
     auto path_it = args->find(flutter::EncodableValue("path"));
     if (path_it == args->end()) {
+        LOG_ERROR("DeleteFileOrFolder called without path argument");
         result->Error("MISSING_ARGUMENT", "Missing 'path' argument");
         return;
     }
 
     const std::string* path = std::get_if<std::string>(&path_it->second);
     if (!path || path->empty()) {
+        LOG_ERROR("DeleteFileOrFolder called with empty path");
         result->Error("INVALID_ARGUMENT", "'path' must be a non-empty string");
         return;
     }
@@ -1130,13 +1154,25 @@ void SquirrelDiskPlugin::DeleteFileOrFolder(const flutter::EncodableValue* argum
         }
     }
 
+    LOG_OPERATION("DeleteFileOrFolder", "Deleting: " + *path + " (force: " + (force_delete ? "true" : "false") + ")");
+
     try {
         std::filesystem::path fs_path(*path);
         std::error_code ec;
 
         // Check if path exists
         if (!std::filesystem::exists(fs_path, ec)) {
+            LOG_WARNING("DeleteFileOrFolder: Path does not exist: " + *path);
             result->Error("PATH_NOT_FOUND", "Path does not exist: " + *path);
+            return;
+        }
+
+        // Security check: prevent deletion of system-critical paths
+        std::string lower_path = *path;
+        std::transform(lower_path.begin(), lower_path.end(), lower_path.begin(), ::tolower);
+        if (lower_path.find("c:\\windows") == 0 || lower_path.find("c:\\program files") == 0) {
+            LOG_ERROR("DeleteFileOrFolder: Attempted to delete system critical path: " + *path);
+            result->Error("SECURITY_ERROR", "Cannot delete system critical paths");
             return;
         }
 
@@ -1176,18 +1212,21 @@ void SquirrelDiskPlugin::DeleteFileOrFolder(const flutter::EncodableValue* argum
         }
 
         if (success) {
+            LOG_OPERATION("DeleteFileOrFolder", "Successfully deleted: " + *path);
             flutter::EncodableMap response;
             response[flutter::EncodableValue("success")] = flutter::EncodableValue(true);
             response[flutter::EncodableValue("path")] = flutter::EncodableValue(*path);
             response[flutter::EncodableValue("method")] = flutter::EncodableValue(force_delete ? "permanent" : "recycle_bin");
             result->Success(flutter::EncodableValue(response));
         } else {
+            LOG_ERROR("DeleteFileOrFolder failed: " + *path + " | Error: " + error_message);
             result->Error("DELETE_FAILED", 
                          "Failed to delete path: " + *path + 
                          (error_message.empty() ? "" : " (" + error_message + ")"));
         }
 
     } catch (const std::exception& e) {
+        LOG_ERROR("Exception in DeleteFileOrFolder: " + std::string(e.what()));
         result->Error("DELETE_ERROR", std::string("Delete operation failed: ") + e.what());
     }
 }

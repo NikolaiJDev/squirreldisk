@@ -11,7 +11,7 @@ add_executable(${BINARY_NAME} WIN32
         "main.cpp"
         "utils.cpp"
         "win32_window.cpp"
-        "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../flutter/generated_plugin_registrant.cc"
         "Runner.rc"
         "runner.exe.manifest"
         "squirreldisk_plugin.cpp"
@@ -43,6 +43,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "WIN32_LEAN_AND_MEAN")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../flutter")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

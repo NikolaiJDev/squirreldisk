@@ -1,6 +1,8 @@
 #include "thread_safe_scan_event_sink.h"
 #include "logger.h"
 
+using namespace squirreldisk_windows;
+
 ThreadSafeScanEventSink::ThreadSafeScanEventSink() {
     LOG_INFO("ThreadSafeScanEventSink constructor");
 }

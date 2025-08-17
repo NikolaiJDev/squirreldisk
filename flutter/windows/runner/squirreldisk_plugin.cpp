@@ -21,7 +21,6 @@
 
 #include <flutter/event_stream_handler_functions.h>
 #include <flutter_windows.h>
-#include <flutter/plugin_registrar_manager.h>
 
 namespace fs = std::filesystem;
 using namespace squirreldisk_windows;

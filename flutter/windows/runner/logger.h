@@ -1,8 +1,14 @@
 #pragma once
 
-// Prevent Windows macros from conflicting with our logger
+// Prevent Windows macros from conflicting with our logger - use ifndef guards
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+
 #ifdef ERROR
 #undef ERROR
 #endif

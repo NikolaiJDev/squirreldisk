@@ -1385,7 +1385,6 @@ void SquirrelDiskPlugin::OpenFile(const flutter::EncodableValue* arguments,
 // C API for plugin registration
 extern "C" __declspec(dllexport) void SquirrelDiskPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {
-    squirreldisk_windows::SquirrelDiskPlugin::RegisterWithRegistrar(
-        flutter::PluginRegistrarManager::GetInstance()
-            ->GetRegistrar<flutter::PluginRegistrarWindows>(registrar));
+    auto plugin_registrar = std::make_unique<flutter::PluginRegistrarWindows>(registrar);
+    squirreldisk_windows::SquirrelDiskPlugin::RegisterWithRegistrar(plugin_registrar.get());
 }

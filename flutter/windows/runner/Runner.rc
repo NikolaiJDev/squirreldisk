@@ -1,4 +1,4 @@
-//Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #pragma code_page(65001)
 #include "resource.h"
@@ -25,18 +25,18 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE 
+1 TEXTINCLUDE
 BEGIN
     "resource.h\0"
 END
 
-2 TEXTINCLUDE 
+2 TEXTINCLUDE
 BEGIN
     "#include ""winres.h""\r\n"
     "\0"
 END
 
-3 TEXTINCLUDE 
+3 TEXTINCLUDE
 BEGIN
     "\r\n"
     "\0"
@@ -60,10 +60,21 @@ IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
 // Version
 //
 
-#ifdef FLUTTER_VERSION_MAJOR
+#if defined(FLUTTER_VERSION_MAJOR) && defined(FLUTTER_VERSION_MINOR) && defined(FLUTTER_VERSION_PATCH) && defined(FLUTTER_VERSION_BUILD)
+#define VERSION_AS_NUMBER FLUTTER_VERSION_MAJOR,FLUTTER_VERSION_MINOR,FLUTTER_VERSION_PATCH,FLUTTER_VERSION_BUILD
+#else
+#define VERSION_AS_NUMBER 1,0,0,0
+#endif
+
+#if defined(FLUTTER_VERSION)
+#define VERSION_AS_STRING FLUTTER_VERSION
+#else
+#define VERSION_AS_STRING "1.0.0"
+#endif
+
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION FLUTTER_VERSION_MAJOR,FLUTTER_VERSION_MINOR,FLUTTER_VERSION_PATCH,FLUTTER_VERSION_BUILD
- PRODUCTVERSION FLUTTER_VERSION_MAJOR,FLUTTER_VERSION_MINOR,FLUTTER_VERSION_PATCH,FLUTTER_VERSION_BUILD
+ FILEVERSION VERSION_AS_NUMBER
+ PRODUCTVERSION VERSION_AS_NUMBER
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
 #ifdef _DEBUG
  FILEFLAGS VS_FF_DEBUG
@@ -79,13 +90,13 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "SquirrelDisk" "\0"
-            VALUE "FileVersion", FLUTTER_VERSION "\0"
+            VALUE "FileDescription", "squirreldisk" "\0"
+            VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "squirreldisk" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
             VALUE "OriginalFilename", "squirreldisk.exe" "\0"
-            VALUE "ProductName", "SquirrelDisk" "\0"
-            VALUE "ProductVersion", FLUTTER_VERSION "\0"
+            VALUE "ProductName", "squirreldisk" "\0"
+            VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
     BLOCK "VarFileInfo"
@@ -93,7 +104,6 @@ BEGIN
         VALUE "Translation", 0x409, 1252
     END
 END
-#endif
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

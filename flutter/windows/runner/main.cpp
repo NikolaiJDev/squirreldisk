@@ -4,7 +4,6 @@
 
 #include "flutter_window.h"
 #include "utils.h"
-#include "logger.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -14,11 +13,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
 
-  // Initialize logging
-  squirreldisk_windows::Logger::getInstance().initialize();
-  squirreldisk_windows::Logger::getInstance().info("SquirrelDisk application starting");
+  // Initialize COM, so that it is available for use in the library and/or
+  // plugins.
+  ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-  // Initialize the Flutter project.
   flutter::DartProject project(L"data");
 
   std::vector<std::string> command_line_arguments =
@@ -29,7 +27,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.CreateAndShow(L"SquirrelDisk", origin, size)) {
+  if (!window.Create(L"squirreldisk", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
@@ -40,8 +38,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
-  squirreldisk_windows::Logger::getInstance().info("SquirrelDisk application shutting down");
-  squirreldisk_windows::Logger::getInstance().shutdown();
-
+  ::CoUninitialize();
   return EXIT_SUCCESS;
 }

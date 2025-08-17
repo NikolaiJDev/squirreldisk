@@ -28,17 +28,15 @@ class Win32Window {
   Win32Window();
   virtual ~Win32Window();
 
-  // Creates and shows a win32 window with |title| that is positioned and sized
-  // using |origin| and |size|. New windows are created on the thread that calls
-  // this method. Window |titulo| can't be const& because the winapi expects a
-  // non-const LPCTSTR when creating a window.
-  //
-  // Returns true if the window was created successfully.
-  bool CreateAndShow(const std::wstring& title, const Point& origin,
-                     const Size& size);
+  // Creates a win32 window with |title| that is positioned and sized using
+  // |origin| and |size|. New windows are created on the default monitor. Window
+  // sizes are specified to the OS in physical pixels, hence to ensure a
+  // consistent size this function will scale the inputted width and height as
+  // as appropriate for the default monitor. The window is invisible until
+  // |Show| is called. Returns true if the window was created successfully.
+  bool Create(const std::wstring& title, const Point& origin, const Size& size);
 
-  // Show the current window. Intended for use when creating a window
-  // initially hidden.
+  // Show the current window. Returns true if the window was successfully shown.
   bool Show();
 
   // Release OS resources associated with window.
@@ -61,7 +59,8 @@ class Win32Window {
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
   // inheriting classes can handle.
-  virtual LRESULT MessageHandler(HWND window, UINT const message,
+  virtual LRESULT MessageHandler(HWND window,
+                                 UINT const message,
                                  WPARAM const wparam,
                                  LPARAM const lparam) noexcept;
 
@@ -78,13 +77,14 @@ class Win32Window {
   // OS callback called by message pump. Handles the WM_NCCREATE message which
   // is passed when the non-client area is being created and enables automatic
   // non-client DPI scaling so that the non-client area automatically
-  // respondes to changes in DPI. All other messages are handled by
+  // responds to changes in DPI. All other messages are handled by
   // MessageHandler.
-  static LRESULT CALLBACK WndProc(HWND const window, UINT const message,
+  static LRESULT CALLBACK WndProc(HWND const window,
+                                  UINT const message,
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
 
-  // Retrieves a class instance pointer from |window|
+  // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
   // Update the window frame's theme to match the system theme.

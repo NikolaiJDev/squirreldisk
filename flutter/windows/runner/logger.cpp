@@ -1,7 +1,10 @@
 #include "logger.h"
 #include <filesystem>
 
-// Ensure ERROR macro doesn't conflict with our enum
+// Prevent Windows macros from interfering BEFORE any Windows headers
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+// Undefine problematic macros before including Windows headers
 #ifdef ERROR
 #undef ERROR
 #endif
@@ -9,6 +12,11 @@
 #include <windows.h>
 #include <psapi.h>
 #include <iostream>
+
+// Ensure ERROR macro is still undefined after Windows headers
+#ifdef ERROR
+#undef ERROR
+#endif
 
 namespace fs = std::filesystem;
 
@@ -38,7 +46,15 @@ bool Logger::initialize(const std::string& log_dir) {
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
         std::stringstream ss;
-        ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+        
+        // Use localtime_s for thread-safe and secure time formatting
+        struct tm timeinfo;
+        if (localtime_s(&timeinfo, &time_t) == 0) {
+            ss << std::put_time(&timeinfo, "%Y%m%d_%H%M%S");
+        } else {
+            // Fallback to simple timestamp if localtime_s fails
+            ss << "unknown_time_" << time_t;
+        }
         
         log_file_path_ = actual_log_dir + "\\squirreldisk_plugin_" + ss.str() + ".log";
         
@@ -105,11 +121,12 @@ void Logger::warning(const std::string& message, const std::string& function, in
 }
 
 void Logger::error(const std::string& message, const std::string& function, int line) {
-    log(LogLevel::ERROR, message, function, line);
+    // Use explicit scope resolution to avoid macro conflicts
+    log(squirreldisk_windows::LogLevel::ERROR, message, function, line);
 }
 
 void Logger::fatal(const std::string& message, const std::string& function, int line) {
-    log(LogLevel::FATAL, message, function, line);
+    log(squirreldisk_windows::LogLevel::FATAL, message, function, line);
     flush(); // Ensure fatal errors are immediately written
 }
 
@@ -147,7 +164,8 @@ void Logger::logFileOperation(const std::string& operation, const std::string& p
     if (success) {
         info(message, __FUNCTION__, __LINE__);
     } else {
-        error(message, __FUNCTION__, __LINE__);
+        // Use qualified name to avoid macro conflicts
+        this->error(message, __FUNCTION__, __LINE__);
     }
 }
 
@@ -165,7 +183,8 @@ void Logger::logMemoryUsage(const std::string& context) {
             warning("Could not get memory usage for " + context, __FUNCTION__, __LINE__);
         }
     } catch (const std::exception& e) {
-        error("Exception getting memory usage: " + std::string(e.what()), __FUNCTION__, __LINE__);
+        // Use qualified call to avoid macro conflicts
+        this->error("Exception getting memory usage: " + std::string(e.what()), __FUNCTION__, __LINE__);
     }
 }
 
@@ -196,7 +215,8 @@ void Logger::logSystemInfo() {
         writeToFile(thread_info.str());
         
     } catch (const std::exception& e) {
-        error("Exception logging system info: " + std::string(e.what()), __FUNCTION__, __LINE__);
+        // Use qualified call to avoid macro conflicts 
+        this->error("Exception logging system info: " + std::string(e.what()), __FUNCTION__, __LINE__);
     }
 }
 
@@ -207,8 +227,16 @@ std::string Logger::getCurrentTimestamp() {
         now.time_since_epoch()) % 1000;
     
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
-    ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    
+    // Use localtime_s for thread-safe and secure time formatting
+    struct tm timeinfo;
+    if (localtime_s(&timeinfo, &time_t) == 0) {
+        ss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+        ss << "." << std::setfill('0') << std::setw(3) << ms.count();
+    } else {
+        // Fallback timestamp if localtime_s fails
+        ss << "timestamp_error_" << time_t;
+    }
     
     return ss.str();
 }
@@ -218,7 +246,7 @@ std::string Logger::levelToString(LogLevel level) {
         case LogLevel::DEBUG: return "DEBUG  ";
         case LogLevel::INFO: return "INFO   ";
         case LogLevel::WARNING: return "WARNING";
-        case LogLevel::ERROR: return "ERROR  ";
+        case squirreldisk_windows::LogLevel::ERROR: return "ERROR  ";
         case LogLevel::FATAL: return "FATAL  ";
         default: return "UNKNOWN";
     }
@@ -252,8 +280,15 @@ void Logger::rotateLogIfNeeded() {
             auto now = std::chrono::system_clock::now();
             auto time_t = std::chrono::system_clock::to_time_t(now);
             std::stringstream ss;
-            ss << log_file_path_ << ".archive_" 
-               << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+            ss << log_file_path_ << ".archive_";
+            
+            // Use localtime_s for secure time formatting
+            struct tm timeinfo;
+            if (localtime_s(&timeinfo, &time_t) == 0) {
+                ss << std::put_time(&timeinfo, "%Y%m%d_%H%M%S");
+            } else {
+                ss << time_t; // Fallback to raw timestamp
+            }
             
             // Move current log to archive
             fs::rename(log_file_path_, ss.str());

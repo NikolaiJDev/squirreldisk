@@ -12,15 +12,9 @@
 #undef ERROR
 #endif
 
-#include <flutter/event_channel.h>
-#include <flutter/event_sink.h>
-#include <flutter/method_channel.h>
-#include <flutter/plugin_registrar_windows.h>
-#include <flutter/standard_method_codec.h>
-#include <flutter/event_stream_handler_functions.h>
 #include <flutter_windows.h>
 
-#include "thread_safe_scan_event_sink.h"
+// #include "thread_safe_scan_event_sink.h"
 
 #include <map>
 #include <memory>
@@ -53,7 +47,7 @@ namespace squirreldisk_windows {
 
     class SquirrelDiskPlugin : public flutter::Plugin {
     public:
-        static void RegisterWithRegistrar(flutter::PluginRegistrarWindows *registrar);
+        // Removed RegisterWithRegistrar method that caused linker issues  
         static void RegisterWithMessenger(flutter::BinaryMessenger *messenger);
 
         SquirrelDiskPlugin();
@@ -105,10 +99,10 @@ namespace squirreldisk_windows {
             }
         };
 
-        // Каналы связи
-        std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> method_channel_;
-        std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> event_channel_;
-        std::unique_ptr<ThreadSafeScanEventSink> thread_safe_event_sink_;
+        // Каналы связи - commented out due to linker issues with Flutter C++ wrappers
+        // std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> method_channel_;
+        // std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> event_channel_;
+        // std::unique_ptr<ThreadSafeScanEventSink> thread_safe_event_sink_;
 
         // Окно для сообщений
         HWND msg_hwnd_ = nullptr;

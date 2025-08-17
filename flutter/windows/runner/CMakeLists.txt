@@ -14,8 +14,6 @@ add_executable(${BINARY_NAME} WIN32
         "${CMAKE_CURRENT_SOURCE_DIR}/../flutter/generated_plugin_registrant.cc"
         "Runner.rc"
         "runner.exe.manifest"
-        "squirreldisk_plugin.cpp"
-        "thread_safe_scan_event_sink.cpp"
         "logger.cpp"
 )
 

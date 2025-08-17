@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:squirreldisk/enums/disk_type.dart';
 
 import '../models/disk_info.dart';
 import '../services/disk_service.dart';
@@ -112,7 +113,7 @@ class EnhancedDiskListWidget extends StatelessWidget {
                 child: Icon(
                   _getDiskIcon(disk),
                   size: 28,
-                  color: AppTheme.getDiskTypeColor(disk.type ?? 'fixed'),
+                  color: AppTheme.getDiskTypeColor(disk.type.toString().toLowerCase()),
                 ),
               ),
               
@@ -281,7 +282,7 @@ class EnhancedDiskListWidget extends StatelessWidget {
           const SizedBox(width: 16),
           
           // Text content
-          Expanded(
+          const Expanded(
             child: Text(
               'Select a folder to Scan',
               style: TextStyle(
@@ -297,7 +298,7 @@ class EnhancedDiskListWidget extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -306,7 +307,7 @@ class EnhancedDiskListWidget extends StatelessWidget {
             size: 64,
             color: AppTheme.darkSubtext,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'No disks found',
             style: TextStyle(
@@ -315,7 +316,7 @@ class EnhancedDiskListWidget extends StatelessWidget {
               color: AppTheme.darkText,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Check your system connections',
             style: TextStyle(
@@ -339,15 +340,15 @@ class EnhancedDiskListWidget extends StatelessWidget {
   }
 
   IconData _getDiskIcon(DiskInfo disk) {
-    final diskType = disk.type?.toLowerCase() ?? 'fixed';
-    switch (diskType) {
-      case 'removable':
+
+    switch (disk.type) {
+      case DiskType.removable:
         return Icons.usb;
-      case 'cdrom':
+      case DiskType.cdrom:
         return Icons.album;
-      case 'network':
+      case DiskType.network:
         return Icons.lan;
-      case 'ramdisk':
+      case DiskType.ram:
         return Icons.memory;
       default:
         return Icons.storage;

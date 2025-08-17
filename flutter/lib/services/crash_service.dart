@@ -30,7 +30,7 @@ class CrashService {
       // Set up isolate error handling
       Isolate.current.addErrorListener(RawReceivePort((pair) async {
         final List<dynamic> errorAndStacktrace = pair;
-        await Logger.instance.fatal(
+        Logger.instance.fatal(
           'Isolate Error: ${errorAndStacktrace[0]}',
           errorAndStacktrace[0],
           errorAndStacktrace[1] != null ? StackTrace.fromString(errorAndStacktrace[1]) : null,

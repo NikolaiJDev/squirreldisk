@@ -14,6 +14,8 @@
 #include <optional>
 
 #include <flutter/event_stream_handler_functions.h>
+#include <flutter_windows.h>
+#include <flutter/plugin_registrar_manager.h>
 
 namespace fs = std::filesystem;
 using namespace squirreldisk_windows;
@@ -1374,3 +1376,11 @@ void SquirrelDiskPlugin::OpenFile(const flutter::EncodableValue* arguments,
 }
 
 } // namespace squirreldisk_windows
+
+// C API for plugin registration
+extern "C" __declspec(dllexport) void SquirrelDiskPluginRegisterWithRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar) {
+    squirreldisk_windows::SquirrelDiskPlugin::RegisterWithRegistrar(
+        flutter::PluginRegistrarManager::GetInstance()
+            ->GetRegistrar<flutter::PluginRegistrarWindows>(registrar));
+}

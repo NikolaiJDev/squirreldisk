@@ -6,6 +6,7 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 #include <flutter/event_stream_handler_functions.h>
+#include <flutter_windows.h>
 
 #include "thread_safe_scan_event_sink.h"
 
@@ -208,3 +209,7 @@ namespace squirreldisk_windows {
     };
 
 } // namespace squirreldisk_windows
+
+// C API for plugin registration
+extern "C" __declspec(dllexport) void SquirrelDiskPluginRegisterWithRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar);

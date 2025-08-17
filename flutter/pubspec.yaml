@@ -1,0 +1,51 @@
+name: squirreldisk
+description: A Flutter application for disk usage analysis and visualization
+version: 0.3.4+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI and State Management
+  provider: ^6.1.1
+  cupertino_icons: ^1.0.2
+  
+  # File System and Platform
+  path_provider: ^2.1.1
+  path: ^1.8.3
+  file_picker: ^10.3.1
+
+  # Charts and Visualization
+  fl_chart: ^1.0.0
+
+  # Utilities
+  pretty_bytes: ^6.3.0
+  uuid: ^4.1.0
+
+  # Platform Integration
+  window_manager: ^0.5.1
+
+  ffi: ^2.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+#  assets:
+#    - assets/images/
+#    - assets/icons/
+#
+#  fonts:
+#    - family: Inter
+#      fonts:
+#        - asset: assets/fonts/Inter-Regular.ttf
+#        - asset: assets/fonts/Inter-Bold.ttf
+#          weight: 700

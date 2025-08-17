@@ -5,6 +5,12 @@
 #include <shellapi.h>
 #include <thread>
 #include <vector>
+
+// Ensure ERROR macro doesn't conflict with our enum after including logger.h
+#ifdef ERROR
+#undef ERROR  
+#endif
+
 #include <windows.h>
 #include <shlwapi.h>
 #include <shlobj.h>

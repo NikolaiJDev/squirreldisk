@@ -21,7 +21,11 @@ add_executable(${BINARY_NAME} WIN32
 
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
-apply_standard_settings(${BINARY_NAME})
+APPLY_STANDARD_SETTINGS(${BINARY_NAME})
+
+# Explicitly set C++ standard to ensure enum class and other modern features work
+set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD 17)
+set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # Add preprocessor definitions for the build version.
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
@@ -32,6 +36,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTT
 
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
+target_compile_definitions(${BINARY_NAME} PRIVATE "WIN32_LEAN_AND_MEAN")
 
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.

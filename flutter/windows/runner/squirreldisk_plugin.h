@@ -1,5 +1,17 @@
 #pragma once
 
+// Prevent Windows macros from conflicting with our code
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// Prevent Windows ERROR macro from conflicting with our enum
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <flutter/event_channel.h>
 #include <flutter/event_sink.h>
 #include <flutter/method_channel.h>

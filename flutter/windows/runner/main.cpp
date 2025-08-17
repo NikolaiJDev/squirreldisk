@@ -1,3 +1,14 @@
+// Prevent Windows macros from conflicting with our code
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX  
+#define NOMINMAX
+#endif
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>

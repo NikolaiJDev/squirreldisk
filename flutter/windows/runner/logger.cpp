@@ -1,5 +1,11 @@
 #include "logger.h"
 #include <filesystem>
+
+// Ensure ERROR macro doesn't conflict with our enum
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <windows.h>
 #include <psapi.h>
 #include <iostream>

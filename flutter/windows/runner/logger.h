@@ -1,5 +1,10 @@
 #pragma once
 
+// Prevent Windows macros from conflicting with our logger
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <string>
 #include <fstream>
 #include <memory>
